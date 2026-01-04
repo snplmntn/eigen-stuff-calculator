@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eigen-stuff Calculator</title>
+    <meta name="description" content="Calculate eigenvalues and eigenspace bases for n×n matrices (n ≤ 5). A beautiful, precise linear algebra tool.">
+    
+    <!-- Google Fonts: Playfair Display (Display) + JetBrains Mono (Code) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;500;700&family=Playfair+Display:ital,wght@0,900;1,900&display=swap" rel="stylesheet">
+    
+    <!-- math.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.2/math.min.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Atmospheric Background -->
+    <div class="bg-atmosphere" aria-hidden="true">
+        <div class="bg-grid"></div>
+        <div class="bg-glow bg-glow--1"></div>
+        <div class="bg-glow bg-glow--2"></div>
+    </div>
+
+    <main class="container">
+        <!-- Hero -->
+        <header class="hero anim-stagger" style="--stagger: 0">
+            <h1 class="hero__title">Eigen<span class="hero__accent">-stuff</span></h1>
+            <p class="hero__subtitle">Eigenvalues & Eigenspace Bases for n×n Matrices</p>
+        </header>
+
+        <!-- Controls -->
+        <section class="controls anim-stagger" style="--stagger: 1">
+            <label class="dimension-label" for="dimension-slider">
+                Matrix Dimension (n)
+            </label>
+            <div class="dimension-control">
+                <input 
+                    type="range" 
+                    id="dimension-slider" 
+                    min="2" 
+                    max="5" 
+                    value="3" 
+                    class="slider"
+                >
+                <output id="dimension-display" class="dimension-value">3</output>
+            </div>
+        </section>
+
+        <!-- Matrix Input Grid -->
+        <section class="matrix-section anim-stagger" style="--stagger: 2">
+            <div class="matrix-wrapper">
+                <span class="matrix-bracket matrix-bracket--left">[</span>
+                <div id="matrix-grid" class="matrix-grid" role="grid" aria-label="Matrix input grid">
+                    <!-- Dynamically generated inputs -->
+                </div>
+                <span class="matrix-bracket matrix-bracket--right">]</span>
+            </div>
+        </section>
+
+        <!-- Action Button -->
+        <section class="action-section anim-stagger" style="--stagger: 3">
+            <button id="compute-btn" class="btn-compute">
+                <span class="btn-compute__text">COMPUTE EIGENS</span>
+                <span class="btn-compute__icon">→</span>
+            </button>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" class="results-section" aria-live="polite">
+            <!-- Dynamically populated -->
+        </section>
+
+        <!-- Error Display -->
+        <div id="error-display" class="error-display" role="alert" aria-hidden="true"></div>
+    </main>
+
+    <footer class="footer anim-stagger" style="--stagger: 4">
+        <p>Powered by <a href="https://mathjs.org/" target="_blank" rel="noopener">math.js</a></p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
