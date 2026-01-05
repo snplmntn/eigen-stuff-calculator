@@ -12,6 +12,7 @@ const formatSelector = document.getElementById('format-selector');
 const formatBtns = document.querySelectorAll('.format-btn');
 const matrixGrid = document.getElementById('matrix-grid');
 const computeBtn = document.getElementById('compute-btn');
+const clearBtn = document.getElementById('clear-btn');
 const resultsSection = document.getElementById('results-section');
 const resultsToolbar = document.getElementById('results-toolbar');
 const errorDisplay = document.getElementById('error-display');
@@ -591,42 +592,177 @@ function computeEigenDataWithMathJS(matrix) {
  * Computes eigenvalues using characteristic polynomial roots,
  * then finds eigenvectors by computing null space of (A - λI).
  */
+/**
+ * Fallback for defective/singular matrices where math.eigs fails.
+ * Uses a robust 3-step process:
+ * 1. Compute characteristic polynomial coefficients (Newton Sums)
+ * 2. Find eigenvalues (roots) using Durand-Kerner method
+ * 3. Find eigenvectors using Null Space of (A - λI)
+ */
 function computeEigenDataFallback(matrix) {
     const n = matrix.length;
+    console.log("Using robust fallback solver...");
+
+    // 1. Get coefficients of characteristic polynomial
+    const coeffs = computeCharacteristicPolyCoeffs(matrix);
     
-    // Step 1: Get eigenvalues (we can use math.js for just eigenvalues using det trick)
-    // For small matrices, compute characteristic polynomial and find roots
-    const eigenvalues = computeEigenvalues(matrix);
+    // 2. Find roots (eigenvalues)
+    const roots = durandKerner(coeffs);
     
-    // Step 2: Group eigenvalues and count multiplicities
+    // Clean roots (snap tiny imaginary parts to 0) to ensure correct grouping
+    const cleanedRoots = roots.map(r => cleanComplex(r));
+    
+    // 3. Group eigenvalues (fuzzy matching)
     const eigenMap = new Map();
     
-    for (const ev of eigenvalues) {
+    cleanedRoots.forEach(root => {
         let found = false;
+        
         for (const [key, data] of eigenMap) {
-            if (complexApproxEqual(key, ev)) {
+            if (complexApproxEqual(key, root)) {
                 data.algebraicMultiplicity++;
                 found = true;
                 break;
             }
         }
+        
         if (!found) {
-            eigenMap.set(ev, {
-                eigenvalue: ev,
-                eigenvectors: [],
-                algebraicMultiplicity: 1
+            eigenMap.set(root, {
+                eigenvalue: root,
+                algebraicMultiplicity: 1,
+                eigenvectors: []
             });
+        }
+    });
+
+    // 4. Compute eigenvectors for each unique eigenvalue
+    const eigenDataArray = [];
+    
+    for (const data of eigenMap.values()) {
+        const lambda = data.eigenvalue;
+        
+        // Use the complex null space solver
+        const vectors = computeComplexNullSpace(matrix, lambda);
+        
+        // Normalize
+        const normalizedVectors = vectors.map(v => normalizeComplexVector(v));
+        
+        eigenDataArray.push({
+            eigenvalue: lambda,
+            eigenvectors: normalizedVectors,
+            algebraicMultiplicity: data.algebraicMultiplicity
+        });
+    }
+    
+    // Sort logic
+    // Sorting is handled by the caller (computeEigenData)
+    return { eigenData: eigenDataArray, matrix };
+}
+
+/**
+ * Snaps tiny components of complex number to 0.
+ */
+function cleanComplex(c, tol = 1e-6) {
+    let re = typeof c === 'number' ? c : c.re;
+    let im = typeof c === 'number' ? 0 : c.im;
+    
+    if (Math.abs(re) < tol) re = 0;
+    if (Math.abs(im) < tol) im = 0;
+    
+    // Also snap integers if very close (e.g. 4.9999999 -> 5)
+    if (Math.abs(re - Math.round(re)) < tol) re = Math.round(re);
+    if (Math.abs(im - Math.round(im)) < tol) im = Math.round(im);
+    
+    return math.complex(re, im);
+}
+
+/**
+ * Computes char poly coeffs using Newton Sums.
+ * Returns [c_0, c_1, ..., c_n] where P(x) = sum(c_i * x^i)
+ */
+function computeCharacteristicPolyCoeffs(matrix) {
+    const n = matrix.length;
+    const traces = [];
+    let currentPower = matrix;
+    
+    for (let k = 1; k <= n; k++) {
+        let tr = math.complex(0, 0);
+        for (let i = 0; i < n; i++) {
+             let diag = currentPower[i][i];
+             // Ensure complex type
+             if (typeof diag === 'number') diag = math.complex(diag, 0);
+             tr = math.add(tr, diag);
+        }
+        traces.push(tr);
+        
+        if (k < n) {
+            currentPower = math.multiply(currentPower, matrix);
         }
     }
     
-    // Step 3: For each unique eigenvalue, find eigenvectors via null space
-    for (const [eigenvalue, data] of eigenMap) {
-        const eigenvectors = computeNullSpace(matrix, eigenvalue);
-        data.eigenvectors = eigenvectors.length > 0 ? eigenvectors : [[1]]; // Fallback
+    const coeffs = new Array(n + 1).fill(math.complex(0,0));
+    coeffs[n] = math.complex(1, 0);
+    
+    for (let k = 1; k <= n; k++) {
+        let sum = math.complex(0, 0);
+        for (let j = 1; j <= k; j++) {
+            const term = math.multiply(coeffs[n - k + j], traces[j-1]); 
+            sum = math.add(sum, term);
+        }
+        coeffs[n - k] = math.divide(math.unaryMinus(sum), k);
     }
     
-    const eigenDataArray = Array.from(eigenMap.values());
-    return { eigenData: eigenDataArray, matrix };
+    return coeffs;
+}
+
+/**
+ * Finds roots using Durand-Kerner method.
+ */
+function durandKerner(coeffs) {
+    const n = coeffs.length - 1;
+    let roots = [];
+    
+    // Radius R = 1 + max(|c_i|)
+    let maxCoeffMag = 0;
+    for (let i = 0; i < n; i++) {
+        const mag = complexMagnitude(coeffs[i]);
+        if (mag > maxCoeffMag) maxCoeffMag = mag;
+    }
+    const R = 1 + maxCoeffMag;
+    
+    for (let k = 0; k < n; k++) {
+        const theta = (2 * Math.PI * k) / n + 0.1; 
+        roots.push(math.multiply(R, math.complex({r: 1, phi: theta})));
+    }
+    
+    for (let iter = 0; iter < 50; iter++) {
+        let maxChange = 0;
+        const nextRoots = [...roots];
+        
+        for (let i = 0; i < n; i++) {
+            const z = roots[i];
+            let pVal = math.complex(0, 0);
+            for (let j = n; j >= 0; j--) {
+                pVal = math.add(math.multiply(pVal, z), coeffs[j]);
+            }
+            
+            let qVal = math.complex(1, 0);
+            for (let j = 0; j < n; j++) {
+                if (i !== j) {
+                    qVal = math.multiply(qVal, math.subtract(z, roots[j]));
+                }
+            }
+            
+            const delta = math.divide(pVal, qVal);
+            nextRoots[i] = math.subtract(z, delta);
+            
+            const mag = complexMagnitude(delta);
+            if (mag > maxChange) maxChange = mag;
+        }
+        roots = nextRoots;
+        if (maxChange < 1e-12) break;
+    }
+    return roots;
 }
 
 /**
@@ -1444,6 +1580,11 @@ function init() {
     dimensionSelector.addEventListener('click', handleDimensionChange);
     computeBtn.addEventListener('click', handleCompute);
     
+    // Clear button
+    if (clearBtn) {
+        clearBtn.addEventListener('click', handleClear);
+    }
+    
     // Test suite button
     const runTestsBtn = document.getElementById('run-tests-btn');
     if (runTestsBtn) {
@@ -1498,4 +1639,23 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {
     init();
+}
+/**
+ * Handles clearing the matrix input and results.
+ */
+function handleClear() {
+    // Reset all inputs to empty
+    const inputs = matrixGrid.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.value = '';
+    });
+    
+    // Clear results
+    resultsSection.innerHTML = '';
+    resultsToolbar.setAttribute('aria-hidden', 'true');
+    hideError();
+    
+    // Clear state
+    lastEigenData = null;
+    lastMatrix = null;
 }
