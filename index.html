@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eigen-stuff Calculator</title>
     <meta name="description" content="Calculate eigenvalues and eigenspace bases for n×n matrices (n ≤ 5). A beautiful, precise linear algebra tool.">
+    <link rel="icon" type="image/png" href="favicon.png">
     
     <!-- Google Fonts: Playfair Display (Display) + JetBrains Mono (Code) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,19 +34,12 @@
 
         <!-- Controls -->
         <section class="controls anim-stagger" style="--stagger: 1">
-            <label class="dimension-label" for="dimension-slider">
-                Matrix Dimension (n)
-            </label>
-            <div class="dimension-control">
-                <input 
-                    type="range" 
-                    id="dimension-slider" 
-                    min="2" 
-                    max="5" 
-                    value="3" 
-                    class="slider"
-                >
-                <output id="dimension-display" class="dimension-value">3</output>
+            <span class="dimension-label">Matrix Dimension</span>
+            <div id="dimension-selector" class="dimension-selector" role="radiogroup" aria-label="Select matrix dimension">
+                <button type="button" class="dimension-btn" data-dimension="2" aria-checked="false">2×2</button>
+                <button type="button" class="dimension-btn active" data-dimension="3" aria-checked="true">3×3</button>
+                <button type="button" class="dimension-btn" data-dimension="4" aria-checked="false">4×4</button>
+                <button type="button" class="dimension-btn" data-dimension="5" aria-checked="false">5×5</button>
             </div>
         </section>
 
@@ -60,13 +54,28 @@
             </div>
         </section>
 
-        <!-- Action Button -->
+        <!-- Action Buttons -->
         <section class="action-section anim-stagger" style="--stagger: 3">
             <button id="compute-btn" class="btn-compute">
                 <span class="btn-compute__text">COMPUTE EIGENS</span>
                 <span class="btn-compute__icon">→</span>
             </button>
+            <!-- Production: Hide verification suite
+            <button id="run-tests-btn" class="btn-test">
+                <span class="btn-test__text">RUN VERIFICATION SUITE</span>
+            </button>
+            -->
         </section>
+
+        <!-- Results Toolbar (hidden until results are shown) -->
+        <div id="results-toolbar" class="results-toolbar" aria-hidden="true">
+            <span class="results-toolbar__label">Vector Format</span>
+            <div id="format-selector" class="format-selector" role="radiogroup" aria-label="Select vector format">
+                <button type="button" class="format-btn" data-format="simplified" aria-checked="false">Integers</button>
+                <button type="button" class="format-btn active" data-format="fractions" aria-checked="true">Fractions</button>
+                <button type="button" class="format-btn" data-format="normalized" aria-checked="false">Normalized</button>
+            </div>
+        </div>
 
         <!-- Results Section -->
         <section id="results-section" class="results-section" aria-live="polite">
